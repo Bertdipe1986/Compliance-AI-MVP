@@ -14,3 +14,5 @@ passlib[bcrypt]==1.7.4
 email-validator==2.1.1
 email-validator==2.1.1
 python-jose==3.5.0
+cryptography==46.0.3
+python-jose==3.5.0

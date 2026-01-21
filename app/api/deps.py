@@ -1,9 +1,10 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_db
-from app.core.security import decode_token
 from app.models.user import User
 
 
@@ -14,26 +15,32 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     try:
-        payload = decode_token(token)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
         )
+        email: str | None = payload.get("sub")
+        if not email:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
 
-    subject = payload.get("sub")
-    if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-        )
+    user = db.query(User).filter(User.email == email).one_or_none()
+    if not user:
+        raise credentials_exception
 
-    user = db.query(User).filter(User.email == subject).one_or_none()
-    if not user or not user.is_active:
+    if hasattr(user, "is_active") and user.is_active is False:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user",
         )
 
     return user
