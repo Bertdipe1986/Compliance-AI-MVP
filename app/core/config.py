@@ -19,5 +19,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    INVITE_CODE: str
+
 
 settings = Settings()
